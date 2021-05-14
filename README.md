@@ -18,3 +18,7 @@ This project requires ESP8266 microcontroller with connected modules:
 - Switching power sockets basing on current time from web/clock module and settings from database/eeprom.
 
 For my purpose I created additional project Smart home (https://github.com/wojtaszek171/SmartHome) which display all values and settings.
+
+Built prototype: 
+
+![Prototype](https://github.com/wojtaszek171/MicrocontrollerHome/blob/readme-images/prototype-min.jpg)
