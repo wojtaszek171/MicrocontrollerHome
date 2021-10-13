@@ -8,22 +8,22 @@
 #include <DallasTemperature.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_BME280.h>
+#include "DHTesp.h"
 #include <sntp.h>
 #include <EEPROM.h>
 #include <cstring>
 
 /* define constants of various pins for easy accessibility */
-#define RELAY1 D0
+#define RELAY1 D3
 #define RELAY2 D5
 #define RELAY3 D6
 #define RELAY4 D7
 
-#define RELAYFEED D4
-#define THERMOMETER D3
+#define THERMOMETER D4
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 #define MYTZ TZ_Europe_Warsaw
+#define DHTPIN D0
 
 uint en1 = 0;
 String start1 = "";
@@ -43,7 +43,8 @@ String stop4 = "";
 
 OneWire oneWire(THERMOMETER);
 DallasTemperature tempSensors(&oneWire);
-Adafruit_BME280 bme;
+
+DHTesp dht;
 
 static timeval tv;
 static timespec tp;
@@ -119,15 +120,21 @@ public:
   }
   void init()
   {
+    Serial.print("init: ");
+    Serial.println(pin);
     pinMode(pin, OUTPUT);
     digitalWrite(pin, HIGH);
   }
   void on()
   {
+    Serial.print("on: ");
+    Serial.println(pin);
     digitalWrite(pin, LOW);
   }
   void off()
   {
+    Serial.print("off: ");
+    Serial.println(pin);
     digitalWrite(pin, HIGH);
   }
   void setTimes(bool _enabled, char *_start, char *_stop)
@@ -180,6 +187,7 @@ public:
         }
         else
         {
+          Serial.print("off");
           off();
         }
       }
@@ -223,7 +231,6 @@ void fetchSockets()
       String str_obj(http.getString());
       char_arr = &str_obj[0];
       DeserializationError error = deserializeJson(doc, char_arr);
-
       if (error)
       {
         Serial.print(F("deserializeJson() failed: "));
@@ -298,24 +305,16 @@ void readSensors()
 {
   tempSensors.requestTemperatures();
   float waterTemp = tempSensors.getTempCByIndex(0);
-  float roomTemp = bme.readTemperature();
-  float roomHumidity = bme.readHumidity();
-  float roomPressure = bme.readPressure() / 100;
+
+  float roomTemp = dht.getTemperature();
+  float roomHumidity = dht.getHumidity();
 
   if (WiFi.status() == WL_CONNECTED)
   {
     setSensor("waterTemp", waterTemp);
-    setSensor("roomTemp", roomTemp);
-    setSensor("roomHumidity", roomHumidity);
-    setSensor("pressure", roomPressure);
+    setSensor("roomAquariumTemp", roomTemp);
+    setSensor("roomAquariumHumidity", roomHumidity);
   }
-}
-
-void feed()
-{
-  digitalWrite(RELAYFEED, LOW);
-  delay(100);
-  digitalWrite(RELAYFEED, HIGH);
 }
 
 void setSocketsState()
@@ -478,24 +477,19 @@ void saveSettingsToEEPROM()
 void setup(void)
 {
   digitalWrite(THERMOMETER, HIGH);
-  pinMode(RELAYFEED, OUTPUT);
-  digitalWrite(RELAYFEED, HIGH);
   Serial.begin(9600);
   while (!Serial)
   {}
   Wire.begin();
   EEPROM.begin(512);
-
-  readEEPromData();
-  recoverLastSockets();
-
+  digitalWrite(DHTPIN, HIGH);
+  dht.setup(DHTPIN, DHTesp::DHT22);
   tempSensors.begin();
-  bme.begin(0x76);
-
   delay(10);
   WiFi.begin(ssid, password); /* connect to WiFi */
-
   configTime(MYTZ, "pool.ntp.org");
+  readEEPromData();
+  recoverLastSockets();
 }
 
 void loop(void)
