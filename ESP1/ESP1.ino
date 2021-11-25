@@ -25,6 +25,8 @@
 #define MYTZ TZ_Europe_Warsaw
 #define DHTPIN D0
 
+WiFiClient wifi;
+
 uint en1 = 0;
 String start1 = "";
 String stop1 = "";
@@ -93,6 +95,8 @@ private:
   bool enabled;
   String start;
   String stop;
+  String lightModes;
+  int currentMode;
   bool isEarlier(int h1, int m1, int h2, int m2)
   {
     if (h1 < h2)
@@ -116,6 +120,8 @@ public:
     this->enabled = false;
     this->start = "";
     this->stop = "";
+    this->lightModes = "";
+    this->currentMode = 1;
     init();
   }
   void init()
@@ -127,21 +133,50 @@ public:
   }
   void on()
   {
-    Serial.print("on: ");
-    Serial.println(pin);
-    digitalWrite(pin, LOW);
+    if (getPinState() == HIGH){
+      delay(5000);  // Required to initialize Aquael lamp (delay of 5s start with mode 1)
+      currentMode = 1;
+      digitalWrite(pin, LOW);
+    }
   }
   void off()
   {
-    Serial.print("off: ");
-    Serial.println(pin);
-    digitalWrite(pin, HIGH);
+    if (getPinState() == LOW){
+      digitalWrite(pin, HIGH);
+    }
   }
-  void setTimes(bool _enabled, char *_start, char *_stop)
+  void blink() {
+    digitalWrite(pin, HIGH);
+    delay(50);
+    digitalWrite(pin, LOW);
+    delay(50);
+  }
+  void changeLightMode(int newMode) // Aquael Leddy Day Night control (turn off and on change light mode)
+  {
+    delay(50);
+    Serial.println("Changing mode:");
+    Serial.print(currentMode);
+    Serial.print(" -> ");
+    Serial.println(newMode);
+    if (currentMode == newMode) {
+      return;
+    }
+    
+    while (currentMode != newMode) {
+      blink();
+      if (currentMode + 1 >3) {
+        currentMode = 1;
+      } else {
+        currentMode++;
+      }
+    }
+  }
+  void setTimes(bool _enabled, char *_start, char *_stop, char *_lightModes)
   {
     enabled = _enabled;
     start = _start;
     stop = _stop;
+    lightModes = _lightModes;
   }
   byte getPin()
   {
@@ -163,15 +198,69 @@ public:
   {
     return digitalRead(pin);
   }
+  void handleLightModes()
+  {
+    if (lightModes != "") {
+      int currH = bcd2dec(mByte[2]);
+      int currM = bcd2dec(mByte[1]);
+      int prevMode = 0;
+      int prevH = 0;
+      int prevM = 0;
+      int index = 0;
+      bool isData = true;
+      while(isData == true) {
+        String lightModeStr = getValue(lightModes, '/', index);
+        if (lightModeStr == NULL || lightModeStr == "") {
+          isData = false;
+          index = 0;
+          lightModeStr = getValue(lightModes, '/', 0);
+        }
+        int modeMode = getValue(lightModeStr, ':', 0).toInt();
+        int modeHour = getValue(lightModeStr, ':', 1).toInt();
+        int modeMinutes = getValue(lightModeStr, ':', 2).toInt();
+
+        if (prevMode != 0) {
+          if (isEarlier(prevH, prevM, modeHour, modeMinutes))
+          {
+            if (!isEarlier(currH, currM, prevH, prevM) && isEarlier(currH, currM, modeHour, modeMinutes))
+            {
+              changeLightMode(prevMode);
+              isData = false;
+            }
+          }
+          else
+          {
+            if (!(isEarlier(currH, currM, prevH, prevM) && !isEarlier(currH, currM, modeHour, modeMinutes)))
+            {
+              changeLightMode(prevMode);
+              isData = false;
+            }
+          }
+        }
+
+        prevMode = modeMode;
+        prevH = modeHour;
+        prevM = modeMinutes;
+        index++;
+      }
+    }
+  }
   void handleCurrentTime()
   {
-    if (enabled)
+    if (!enabled)
     {
-      if (start == "" || stop == "")
-      {
-        on();
-        return;
-      }
+      off();
+      return;
+    }
+    
+    if (start == "" || stop == "")
+    {
+      on();
+      handleLightModes();
+      return;
+    }
+    else
+    {
       int currH = bcd2dec(mByte[2]);
       int currM = bcd2dec(mByte[1]);
       int startH = getValue(start, ':', 0).toInt();
@@ -184,10 +273,10 @@ public:
         if (!(isEarlier(currH, currM, startH, startM) && !isEarlier(currH, currM, stopH, stopM)))
         {
           on();
+          handleLightModes();
         }
         else
         {
-          Serial.print("off");
           off();
         }
       }
@@ -196,16 +285,13 @@ public:
         if (!isEarlier(currH, currM, startH, startM) && isEarlier(currH, currM, stopH, stopM))
         {
           on();
+          handleLightModes();
         }
         else
         {
           off();
         }
       }
-    }
-    else
-    {
-      off();
     }
   }
 };
@@ -220,7 +306,7 @@ void fetchSockets()
   if (WiFi.status() == WL_CONNECTED)
   {
     HTTPClient http;
-    http.begin(serverName + "getSockets.php");
+    http.begin(wifi, serverName + "getSockets.php");
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     String httpRequestData = "api_key=" + apiKeyValue + "";
     int httpCode = http.POST(httpRequestData);
@@ -244,6 +330,7 @@ void fetchSockets()
         const char *socketStart = obj["start"];
         const char *socketStop = obj["stop"];
         const int socketEnabled = obj["enabled"];
+        const char *lightModes = obj["lightModes"];
         const char *s1 = "socket1";
         const char *s2 = "socket2";
         const char *s3 = "socket3";
@@ -251,19 +338,19 @@ void fetchSockets()
 
         if (strcmp(socketKey, s1) == 0)
         {
-          socket1.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop);
+          socket1.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
         }
         else if (strcmp(socketKey, s2) == 0)
         {
-          socket2.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop);
+          socket2.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
         }
         else if (strcmp(socketKey, s3) == 0)
         {
-          socket3.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop);
+          socket3.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
         }
         else if (strcmp(socketKey, s4) == 0)
         {
-          socket4.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop);
+          socket4.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
         }
       }
     }
@@ -279,7 +366,7 @@ void fetchSockets()
 void setSensor(char *name, float value)
 {
   HTTPClient http;
-  http.begin(serverName + "setSensor.php");
+  http.begin(wifi, serverName + "setSensor.php");
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   String httpRequestData = "api_key=" + apiKeyValue + "&name=" + name + "&value=" + value + "";
   int httpCode = http.POST(httpRequestData);
@@ -435,10 +522,10 @@ void readEEPromData()
 
 void recoverLastSockets()
 {
-  socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str());
-  socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str());
-  socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str());
-  socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str());
+  socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str(),(char *) "");
+  socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str(),(char *) "");
+  socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str(),(char *) "");
+  socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str(),(char *) "");
 }
 
 void saveSettingsToEEPROM()
