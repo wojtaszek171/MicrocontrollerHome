@@ -28,3 +28,5 @@ For my purpose I created additional project Smart home (https://github.com/wojta
 ## Built prototype: 
 
 ![Prototype](https://github.com/wojtaszek171/MicrocontrollerHome/blob/readme-images/prototype-min.jpg)
+![Prototype](https://github.com/wojtaszek171/MicrocontrollerHome/blob/readme-images/prototype2.jpg)
+![Prototype](https://github.com/wojtaszek171/MicrocontrollerHome/blob/readme-images/prototype3.jpg)
