@@ -1,19 +1,13 @@
-/*********
-  Complete project details at https://randomnerdtutorials.com  
-*********/
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include "DHTesp.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-#define SEALEVELPRESSURE_HPA (1013.25)
-#define DHTPin D4
+#include "ClosedCube_HDC1080.h"
 
-DHTesp dht;
+ClosedCube_HDC1080 hdc1080;
 WiFiClient wifi;
 
-String microcontrollerId = String("room3"); //ENTER ROOM id SSID
+String microcontrollerId = String("room4");
 /* Enter ssid & password of your WiFi inside double quotes */
 const char *ssid = ""; //ENTER WIFI SSID
 const char *password = ""; //ENTER WIFI PASSWORD
@@ -21,8 +15,6 @@ String serverName = ""; //PUT YOUR API DOMAIN
 String apiKeyValue = ""; //ENTER API KEY
 const long sensorFetchInterval = 5000;
 unsigned long previousMillisSensor = 0;
-
-unsigned long delayTime;
 
 void setSensor(String name, float value)
 {
@@ -41,16 +33,15 @@ void setSensor(String name, float value)
 void readSensors() {
   if (WiFi.status() == WL_CONNECTED)
   {
-    setSensor(microcontrollerId + String("Humidity"), dht.getHumidity());
-    setSensor(microcontrollerId + String("Temp"), dht.getTemperature());
+    setSensor(microcontrollerId + String("Humidity"), hdc1080.readHumidity());
+    setSensor(microcontrollerId + String("Temp"), hdc1080.readTemperature());
   }
 }
 
 void setup() {
   Serial.begin(9600);
 
-  dht.setup(DHTPin, DHTesp::DHT22);
-  delayTime = 1000;
+  hdc1080.begin(0x40);
   WiFi.begin(ssid, password); /* connect to WiFi */
 }
 

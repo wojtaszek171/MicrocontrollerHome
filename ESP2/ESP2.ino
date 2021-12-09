@@ -1,19 +1,15 @@
-/*********
-  Complete project details at https://randomnerdtutorials.com  
-*********/
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
-#include "DHTesp.h"
+#include "ClosedCube_HDC1080.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define DHTPin D4
 
 Adafruit_BME280 bme; // I2C
-DHTesp dht;
+ClosedCube_HDC1080 hdc1080;
+WiFiClient wifi;
 
 String microcontrollerId = String("room1");
 /* Enter ssid & password of your WiFi inside double quotes */
@@ -29,7 +25,7 @@ unsigned long delayTime;
 void setSensor(String name, float value)
 {
   HTTPClient http;
-  http.begin(serverName + "setSensor.php");
+  http.begin(wifi, serverName + "setSensor.php");
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   String httpRequestData = "api_key=" + apiKeyValue + "&name=" + name + "&value=" + value + "";
   int httpCode = http.POST(httpRequestData);
@@ -43,12 +39,10 @@ void setSensor(String name, float value)
 void readSensors() {
   if (WiFi.status() == WL_CONNECTED)
   {
-    setSensor(microcontrollerId + String("Temp"), bme.readTemperature());
+    setSensor(microcontrollerId + String("Temp"), hdc1080.readTemperature());
     setSensor(microcontrollerId + String("Altitude"), bme.readAltitude(SEALEVELPRESSURE_HPA));
     setSensor(microcontrollerId + String("Pressure"), bme.readPressure() / 100.0F);
-    setSensor(microcontrollerId + String("Humidity"), bme.readHumidity());
-    setSensor(microcontrollerId + String("HumidityOut"), dht.getHumidity());
-    setSensor(microcontrollerId + String("TempOut"), dht.getTemperature());
+    setSensor(microcontrollerId + String("Humidity"), hdc1080.readHumidity());
   }
 }
 
@@ -63,7 +57,7 @@ void setup() {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
     while (1);
   }
-  dht.setup(DHTPin, DHTesp::DHT22);
+  hdc1080.begin(0x40);
   delayTime = 1000;
   WiFi.begin(ssid, password); /* connect to WiFi */
 }

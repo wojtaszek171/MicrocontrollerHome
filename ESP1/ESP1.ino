@@ -8,7 +8,7 @@
 #include <DallasTemperature.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include "DHTesp.h"
+#include "ClosedCube_HDC1080.h"
 #include <sntp.h>
 #include <EEPROM.h>
 #include <cstring>
@@ -23,13 +23,13 @@
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 #define MYTZ TZ_Europe_Warsaw
-#define DHTPIN D0
 
 WiFiClient wifi;
 
 uint en1 = 0;
 String start1 = "";
 String stop1 = "";
+String light1 = "";
 
 uint en2 = 0;
 String start2 = "";
@@ -46,7 +46,7 @@ String stop4 = "";
 OneWire oneWire(THERMOMETER);
 DallasTemperature tempSensors(&oneWire);
 
-DHTesp dht;
+ClosedCube_HDC1080 hdc1080;
 
 static timeval tv;
 static timespec tp;
@@ -134,7 +134,9 @@ public:
   void on()
   {
     if (getPinState() == HIGH){
-      delay(5000);  // Required to initialize Aquael lamp (delay of 5s start with mode 1)
+      if (pin == RELAY1) {
+        delay(5000);  // Required to initialize Aquael lamp (delay of 5s start with mode 1)
+      }
       currentMode = 1;
       digitalWrite(pin, LOW);
     }
@@ -193,6 +195,10 @@ public:
   bool getEnabled()
   {
     return enabled;
+  }
+  String getLightModes()
+  {
+    return lightModes;
   }
   int getPinState()
   {
@@ -393,8 +399,8 @@ void readSensors()
   tempSensors.requestTemperatures();
   float waterTemp = tempSensors.getTempCByIndex(0);
 
-  float roomTemp = dht.getTemperature();
-  float roomHumidity = dht.getHumidity();
+  float roomTemp = hdc1080.readTemperature();
+  float roomHumidity = hdc1080.readHumidity();
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -484,6 +490,7 @@ void clearEEPromData()
   stop2 = "";
   stop3 = "";
   stop4 = "";
+  light1 = "";
 }
 
 String readWord(int addr)
@@ -518,11 +525,12 @@ void readEEPromData()
   stop3 = readWord(80);
   start4 = readWord(100);
   stop4 = readWord(110);
+  light1 = readWord(130);
 }
 
 void recoverLastSockets()
 {
-  socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str(),(char *) "");
+  socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str(),(char *) light1.c_str());
   socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str(),(char *) "");
   socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str(),(char *) "");
   socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str(),(char *) "");
@@ -543,6 +551,7 @@ void saveSettingsToEEPROM()
   en2 = socket2.getEnabled();
   en3 = socket3.getEnabled();
   en4 = socket4.getEnabled();
+  light1 = socket1.getLightModes();
   EEPROM.put(0, en1);
   EEPROM.put(30, en2);
   EEPROM.put(60, en3);
@@ -555,6 +564,7 @@ void saveSettingsToEEPROM()
   EEPROM.put(80, stop3);
   EEPROM.put(100, start4);
   EEPROM.put(110, stop4);
+  EEPROM.put(130, light1);
   EEPROM.commit();
 
   readEEPromData();
@@ -569,8 +579,7 @@ void setup(void)
   {}
   Wire.begin();
   EEPROM.begin(512);
-  digitalWrite(DHTPIN, HIGH);
-  dht.setup(DHTPIN, DHTesp::DHT22);
+  hdc1080.begin(0x40);
   tempSensors.begin();
   delay(10);
   WiFi.begin(ssid, password); /* connect to WiFi */
