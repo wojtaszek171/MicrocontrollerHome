@@ -35,14 +35,17 @@ String light1 = "";
 int en2 = 0;
 String start2 = "";
 String stop2 = "";
+String light2 = "";
 
 int en3 = 0;
 String start3 = "";
 String stop3 = "";
+String light3 = "";
 
 int en4 = 0;
 String start4 = "";
 String stop4 = "";
+String light4 = "";
 
 OneWire oneWire(THERMOMETER);
 DallasTemperature tempSensors(&oneWire);
@@ -492,6 +495,9 @@ void clearEEPromData()
   stop3 = "";
   stop4 = "";
   light1 = "";
+  light2 = "";
+  light3 = "";
+  light4 = "";
 }
 
 int writeWord(int addrOffset, const String &strToWrite)
@@ -543,6 +549,9 @@ void readEEPromData()
   addressOffset = readWord(addressOffset, &start4);
   addressOffset = readWord(addressOffset, &stop4);
   addressOffset = readWord(addressOffset, &light1);
+  addressOffset = readWord(addressOffset, &light2);
+  addressOffset = readWord(addressOffset, &light3);
+  addressOffset = readWord(addressOffset, &light4);
 
   Serial.println("--");
   Serial.println(en1);
@@ -557,14 +566,18 @@ void readEEPromData()
   Serial.println(stop3);
   Serial.println(start4);
   Serial.println(stop4);
+  Serial.println(light1);
+  Serial.println(light2);
+  Serial.println(light3);
+  Serial.println(light4);
 }
 
 void recoverLastSockets()
 {
   socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str(),(char *) light1.c_str());
-  socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str(),(char *) "");
-  socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str(),(char *) "");
-  socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str(),(char *) "");
+  socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str(),(char *) light2.c_str());
+  socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str(),(char *) light3.c_str());
+  socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str(),(char *) light4.c_str());
 }
 
 void saveSettingsToEEPROM()
@@ -588,6 +601,9 @@ void saveSettingsToEEPROM()
   en3 = socket3.getEnabled();
   en4 = socket4.getEnabled();
   light1 = socket1.getLightModes();
+  light2 = socket2.getLightModes();
+  light3 = socket3.getLightModes();
+  light4 = socket4.getLightModes();
 
   int address = 0;
   EEPROM.put(address, en1);
@@ -609,6 +625,9 @@ void saveSettingsToEEPROM()
   addressOffset = writeWord(addressOffset, start4);
   addressOffset = writeWord(addressOffset, stop4);
   addressOffset = writeWord(addressOffset, light1);
+  addressOffset = writeWord(addressOffset, light2);
+  addressOffset = writeWord(addressOffset, light3);
+  addressOffset = writeWord(addressOffset, light4);
 }
 
 /* This function helps initialize program and set initial values */
