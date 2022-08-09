@@ -10,7 +10,7 @@
 #include <Adafruit_Sensor.h>
 #include "ClosedCube_HDC1080.h"
 #include <sntp.h>
-#include <EEPROM.h>
+#include <ESP_EEPROM.h>
 #include <cstring>
 
 /* define constants of various pins for easy accessibility */
@@ -23,23 +23,24 @@
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 #define MYTZ TZ_Europe_Warsaw
+#define RESET_EEPROM false
 
 WiFiClient wifi;
 
-uint en1 = 0;
+int en1 = 0;
 String start1 = "";
 String stop1 = "";
 String light1 = "";
 
-uint en2 = 0;
+int en2 = 0;
 String start2 = "";
 String stop2 = "";
 
-uint en3 = 0;
+int en3 = 0;
 String start3 = "";
 String stop3 = "";
 
-uint en4 = 0;
+int en4 = 0;
 String start4 = "";
 String stop4 = "";
 
@@ -510,22 +511,61 @@ String readWord(int addr)
   return word;
 }
 
+void writeWord(int addr, String word) {
+  delay(10);
+
+  for (int i = 0; i < word.length(); ++i) {
+    EEPROM.write(addr + i, word[i]);
+  }
+
+  EEPROM.write(addr + word.length(), '\0');
+}
+
 void readEEPromData()
 {
   clearEEPromData();
-  EEPROM.get(0, en1);
-  EEPROM.get(30, en2);
-  EEPROM.get(60, en3);
-  EEPROM.get(90, en4);
-  start1 = readWord(10);
-  stop1 = readWord(20);
-  start2 = readWord(40);
-  stop2 = readWord(50);
-  start3 = readWord(70);
-  stop3 = readWord(80);
-  start4 = readWord(100);
-  stop4 = readWord(110);
-  light1 = readWord(130);
+  int address = 0;
+
+  EEPROM.get(address, en1);
+  address += 6;
+  EEPROM.get(address, en2);
+  address += 6;
+  EEPROM.get(address, en3);
+  address += 6;
+  EEPROM.get(address, en4);
+  address += 6;
+
+  start1 = readWord(address);
+  address += 6;
+  stop1 = readWord(address);
+  address += 6;
+  start2 = readWord(address);
+  address += 6;
+  stop2 = readWord(address);
+  address += 6;
+  start3 = readWord(address);
+  address += 6;
+  stop3 = readWord(address);
+  address += 6;
+  start4 = readWord(address);
+  address += 6;
+  stop4 = readWord(address);
+  address += 6;
+  light1 = readWord(address);
+
+  Serial.println("--");
+  Serial.println(en1);
+  Serial.println(en2);
+  Serial.println(en3);
+  Serial.println(en4);
+  Serial.println(start1);
+  Serial.println(stop1);
+  Serial.println(start2);
+  Serial.println(stop2);
+  Serial.println(start3);
+  Serial.println(stop3);
+  Serial.println(start4);
+  Serial.println(stop4);
 }
 
 void recoverLastSockets()
@@ -552,33 +592,54 @@ void saveSettingsToEEPROM()
   en3 = socket3.getEnabled();
   en4 = socket4.getEnabled();
   light1 = socket1.getLightModes();
-  EEPROM.put(0, en1);
-  EEPROM.put(30, en2);
-  EEPROM.put(60, en3);
-  EEPROM.put(90, en4);
-  EEPROM.put(10, start1);
-  EEPROM.put(20, stop1);
-  EEPROM.put(40, start2);
-  EEPROM.put(50, stop2);
-  EEPROM.put(70, start3);
-  EEPROM.put(80, stop3);
-  EEPROM.put(100, start4);
-  EEPROM.put(110, stop4);
-  EEPROM.put(130, light1);
-  EEPROM.commit();
 
-  readEEPromData();
+  int address = 0;
+  EEPROM.put(address, en1);
+  address += 6;
+  EEPROM.put(address, en2);
+  address += 6;
+  EEPROM.put(address, en3);
+  address += 6;
+  EEPROM.put(address, en4);
+  address += 6;
+
+  writeWord(address, start1);
+  address += 6;
+  writeWord(address, stop1);
+  address += 6;
+  writeWord(address, start2);
+  address += 6;
+  writeWord(address, stop2);
+  address += 6;
+  writeWord(address, start3);
+  address += 6;
+  writeWord(address, stop3);
+  address += 6;
+  writeWord(address, start4);
+  address += 6;
+  writeWord(address, stop4);
+  address += 6;
+  writeWord(address, light1);
+
+  EEPROM.commit();
 }
 
 /* This function helps initialize program and set initial values */
 void setup(void)
 {
+  EEPROM.begin(512);
+  if ( RESET_EEPROM ) {
+    for (int i = 0; i < 512; i++) {
+      EEPROM.write(i, 0);
+    }
+    EEPROM.commit();
+    delay(500);
+  }
   digitalWrite(THERMOMETER, HIGH);
-  Serial.begin(9600);
+  Serial.begin(74880);
   while (!Serial)
   {}
   Wire.begin();
-  EEPROM.begin(512);
   hdc1080.begin(0x40);
   tempSensors.begin();
   delay(10);
