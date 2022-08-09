@@ -10,7 +10,7 @@
 #include <Adafruit_Sensor.h>
 #include "ClosedCube_HDC1080.h"
 #include <sntp.h>
-#include <ESP_EEPROM.h>
+#include <EEPROM.h>
 #include <cstring>
 
 /* define constants of various pins for easy accessibility */
@@ -494,31 +494,29 @@ void clearEEPromData()
   light1 = "";
 }
 
-String readWord(int addr)
+int writeWord(int addrOffset, const String &strToWrite)
 {
-  String word;
-  char readChar;
-  int i = addr;
-
-  while (readChar != '\0')
+  byte len = strToWrite.length();
+  EEPROM.write(addrOffset, len);
+  for (int i = 0; i < len; i++)
   {
-    readChar = char(EEPROM.read(i));
-    delay(10);
-    i++;
-    word += readChar;
+    EEPROM.write(addrOffset + 1 + i, strToWrite[i]);
   }
-
-  return word;
+  EEPROM.commit();
+  return addrOffset + 1 + len;
 }
 
-void writeWord(int addr, String word) {
-  delay(10);
-
-  for (int i = 0; i < word.length(); ++i) {
-    EEPROM.write(addr + i, word[i]);
+int readWord(int addrOffset, String *strToRead)
+{
+  int newStrLen = EEPROM.read(addrOffset);
+  char data[newStrLen + 1];
+  for (int i = 0; i < newStrLen; i++)
+  {
+    data[i] = EEPROM.read(addrOffset + 1 + i);
   }
-
-  EEPROM.write(addr + word.length(), '\0');
+  data[newStrLen] = '\0';
+  *strToRead = String(data);
+  return addrOffset + 1 + newStrLen;
 }
 
 void readEEPromData()
@@ -535,23 +533,16 @@ void readEEPromData()
   EEPROM.get(address, en4);
   address += 6;
 
-  start1 = readWord(address);
-  address += 6;
-  stop1 = readWord(address);
-  address += 6;
-  start2 = readWord(address);
-  address += 6;
-  stop2 = readWord(address);
-  address += 6;
-  start3 = readWord(address);
-  address += 6;
-  stop3 = readWord(address);
-  address += 6;
-  start4 = readWord(address);
-  address += 6;
-  stop4 = readWord(address);
-  address += 6;
-  light1 = readWord(address);
+  int addressOffset;
+  addressOffset = readWord(address, &start1);
+  addressOffset = readWord(addressOffset, &stop1);
+  addressOffset = readWord(addressOffset, &start2);
+  addressOffset = readWord(addressOffset, &stop2);
+  addressOffset = readWord(addressOffset, &start3);
+  addressOffset = readWord(addressOffset, &stop3);
+  addressOffset = readWord(addressOffset, &start4);
+  addressOffset = readWord(addressOffset, &stop4);
+  addressOffset = readWord(addressOffset, &light1);
 
   Serial.println("--");
   Serial.println(en1);
@@ -578,6 +569,11 @@ void recoverLastSockets()
 
 void saveSettingsToEEPROM()
 {
+  for (int i = 0; i < 512; i++) {
+    EEPROM.write(i, '\0');
+  }
+  EEPROM.commit();
+  delay(500);
   clearEEPromData();
   start1 = socket1.getStart();
   stop1 = socket1.getStop();
@@ -603,25 +599,16 @@ void saveSettingsToEEPROM()
   EEPROM.put(address, en4);
   address += 6;
 
-  writeWord(address, start1);
-  address += 6;
-  writeWord(address, stop1);
-  address += 6;
-  writeWord(address, start2);
-  address += 6;
-  writeWord(address, stop2);
-  address += 6;
-  writeWord(address, start3);
-  address += 6;
-  writeWord(address, stop3);
-  address += 6;
-  writeWord(address, start4);
-  address += 6;
-  writeWord(address, stop4);
-  address += 6;
-  writeWord(address, light1);
-
-  EEPROM.commit();
+  int addressOffset;
+  addressOffset = writeWord(address, start1);
+  addressOffset = writeWord(addressOffset, stop1);
+  addressOffset = writeWord(addressOffset, start2);
+  addressOffset = writeWord(addressOffset, stop2);
+  addressOffset = writeWord(addressOffset, start3);
+  addressOffset = writeWord(addressOffset, stop3);
+  addressOffset = writeWord(addressOffset, start4);
+  addressOffset = writeWord(addressOffset, stop4);
+  addressOffset = writeWord(addressOffset, light1);
 }
 
 /* This function helps initialize program and set initial values */
