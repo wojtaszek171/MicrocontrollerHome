@@ -28,23 +28,15 @@
 WiFiClient wifi;
 
 int en1 = 0;
-String start1 = "";
-String stop1 = "";
 String light1 = "";
 
 int en2 = 0;
-String start2 = "";
-String stop2 = "";
 String light2 = "";
 
 int en3 = 0;
-String start3 = "";
-String stop3 = "";
 String light3 = "";
 
 int en4 = 0;
-String start4 = "";
-String stop4 = "";
 String light4 = "";
 
 OneWire oneWire(THERMOMETER);
@@ -97,8 +89,6 @@ class Socket
 private:
   byte pin;
   bool enabled;
-  String start;
-  String stop;
   String lightModes;
   int currentMode;
   bool isEarlier(int h1, int m1, int h2, int m2)
@@ -122,10 +112,8 @@ public:
   {
     this->pin = pin;
     this->enabled = false;
-    this->start = "";
-    this->stop = "";
     this->lightModes = "";
-    this->currentMode = 1;
+    this->currentMode = 0;
     init();
   }
   void init()
@@ -149,6 +137,7 @@ public:
   {
     if (getPinState() == LOW){
       digitalWrite(pin, HIGH);
+      currentMode = 0;
     }
   }
   void blink() {
@@ -167,9 +156,19 @@ public:
     if (currentMode == newMode) {
       return;
     }
-    
+
+    if (newMode == 0) {
+      off();
+      return;
+    }
+
     while (currentMode != newMode) {
-      blink();
+      if (currentMode == 0) {
+        on();
+        currentMode = 0;
+      } else {
+        blink();
+      }
       if (currentMode + 1 >3) {
         currentMode = 1;
       } else {
@@ -177,24 +176,14 @@ public:
       }
     }
   }
-  void setTimes(bool _enabled, char *_start, char *_stop, char *_lightModes)
+  void setTimes(bool _enabled, char *_lightModes)
   {
     enabled = _enabled;
-    start = _start;
-    stop = _stop;
     lightModes = _lightModes;
   }
   byte getPin()
   {
     return pin;
-  }
-  String getStart()
-  {
-    return start;
-  }
-  String getStop()
-  {
-    return stop;
   }
   bool getEnabled()
   {
@@ -213,7 +202,7 @@ public:
     if (lightModes != "") {
       int currH = bcd2dec(mByte[2]);
       int currM = bcd2dec(mByte[1]);
-      int prevMode = 0;
+      int prevMode = -1;
       int prevH = 0;
       int prevM = 0;
       int index = 0;
@@ -229,7 +218,7 @@ public:
         int modeHour = getValue(lightModeStr, ':', 1).toInt();
         int modeMinutes = getValue(lightModeStr, ':', 2).toInt();
 
-        if (prevMode != 0) {
+        if (prevMode != -1) {
           if (isEarlier(prevH, prevM, modeHour, modeMinutes))
           {
             if (!isEarlier(currH, currM, prevH, prevM) && isEarlier(currH, currM, modeHour, modeMinutes))
@@ -263,45 +252,16 @@ public:
       return;
     }
     
-    if (start == "" || stop == "")
+    if (lightModes == "")
     {
       on();
-      handleLightModes();
-      return;
     }
     else
     {
       int currH = bcd2dec(mByte[2]);
       int currM = bcd2dec(mByte[1]);
-      int startH = getValue(start, ':', 0).toInt();
-      int startM = getValue(start, ':', 1).toInt();
-      int stopH = getValue(stop, ':', 0).toInt();
-      int stopM = getValue(stop, ':', 1).toInt();
 
-      if (isEarlier(stopH, stopM, startH, startM))
-      {
-        if (!(isEarlier(currH, currM, startH, startM) && !isEarlier(currH, currM, stopH, stopM)))
-        {
-          on();
-          handleLightModes();
-        }
-        else
-        {
-          off();
-        }
-      }
-      else
-      {
-        if (!isEarlier(currH, currM, startH, startM) && isEarlier(currH, currM, stopH, stopM))
-        {
-          on();
-          handleLightModes();
-        }
-        else
-        {
-          off();
-        }
-      }
+      handleLightModes();
     }
   }
 };
@@ -337,8 +297,6 @@ void fetchSockets()
       {
         JsonObject obj = doc[i];
         const char *socketKey = obj["key"];
-        const char *socketStart = obj["start"];
-        const char *socketStop = obj["stop"];
         const int socketEnabled = obj["enabled"];
         const char *lightModes = obj["lightModes"];
         const char *s1 = "socket1";
@@ -348,19 +306,19 @@ void fetchSockets()
 
         if (strcmp(socketKey, s1) == 0)
         {
-          socket1.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
+          socket1.setTimes(socketEnabled, (char *)lightModes);
         }
         else if (strcmp(socketKey, s2) == 0)
         {
-          socket2.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
+          socket2.setTimes(socketEnabled, (char *)lightModes);
         }
         else if (strcmp(socketKey, s3) == 0)
         {
-          socket3.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
+          socket3.setTimes(socketEnabled, (char *)lightModes);
         }
         else if (strcmp(socketKey, s4) == 0)
         {
-          socket4.setTimes(socketEnabled, (char *)socketStart, (char *)socketStop, (char *)lightModes);
+          socket4.setTimes(socketEnabled, (char *)lightModes);
         }
       }
     }
@@ -486,14 +444,6 @@ void clearEEPromData()
   en2 = 0;
   en3 = 0;
   en4 = 0;
-  start1 = "";
-  start2 = "";
-  start3 = "";
-  start4 = "";
-  stop1 = "";
-  stop2 = "";
-  stop3 = "";
-  stop4 = "";
   light1 = "";
   light2 = "";
   light3 = "";
@@ -540,15 +490,7 @@ void readEEPromData()
   address += 6;
 
   int addressOffset;
-  addressOffset = readWord(address, &start1);
-  addressOffset = readWord(addressOffset, &stop1);
-  addressOffset = readWord(addressOffset, &start2);
-  addressOffset = readWord(addressOffset, &stop2);
-  addressOffset = readWord(addressOffset, &start3);
-  addressOffset = readWord(addressOffset, &stop3);
-  addressOffset = readWord(addressOffset, &start4);
-  addressOffset = readWord(addressOffset, &stop4);
-  addressOffset = readWord(addressOffset, &light1);
+  addressOffset = readWord(address, &light1);
   addressOffset = readWord(addressOffset, &light2);
   addressOffset = readWord(addressOffset, &light3);
   addressOffset = readWord(addressOffset, &light4);
@@ -558,14 +500,6 @@ void readEEPromData()
   Serial.println(en2);
   Serial.println(en3);
   Serial.println(en4);
-  Serial.println(start1);
-  Serial.println(stop1);
-  Serial.println(start2);
-  Serial.println(stop2);
-  Serial.println(start3);
-  Serial.println(stop3);
-  Serial.println(start4);
-  Serial.println(stop4);
   Serial.println(light1);
   Serial.println(light2);
   Serial.println(light3);
@@ -574,10 +508,10 @@ void readEEPromData()
 
 void recoverLastSockets()
 {
-  socket1.setTimes(en1, (char *) start1.c_str(), (char *) stop1.c_str(),(char *) light1.c_str());
-  socket2.setTimes(en2, (char *) start2.c_str(), (char *) stop2.c_str(),(char *) light2.c_str());
-  socket3.setTimes(en3, (char *) start3.c_str(), (char *) stop3.c_str(),(char *) light3.c_str());
-  socket4.setTimes(en4, (char *) start4.c_str(), (char *) stop4.c_str(),(char *) light4.c_str());
+  socket1.setTimes(en1,(char *) light1.c_str());
+  socket2.setTimes(en2,(char *) light2.c_str());
+  socket3.setTimes(en3,(char *) light3.c_str());
+  socket4.setTimes(en4,(char *) light4.c_str());
 }
 
 void saveSettingsToEEPROM()
@@ -588,14 +522,6 @@ void saveSettingsToEEPROM()
   EEPROM.commit();
   delay(500);
   clearEEPromData();
-  start1 = socket1.getStart();
-  stop1 = socket1.getStop();
-  start2 = socket2.getStart();
-  stop2 = socket2.getStop();
-  start3 = socket3.getStart();
-  stop3 = socket3.getStop();
-  start4 = socket4.getStart();
-  stop4 = socket4.getStop();
   en1 = socket1.getEnabled();
   en2 = socket2.getEnabled();
   en3 = socket3.getEnabled();
@@ -616,15 +542,7 @@ void saveSettingsToEEPROM()
   address += 6;
 
   int addressOffset;
-  addressOffset = writeWord(address, start1);
-  addressOffset = writeWord(addressOffset, stop1);
-  addressOffset = writeWord(addressOffset, start2);
-  addressOffset = writeWord(addressOffset, stop2);
-  addressOffset = writeWord(addressOffset, start3);
-  addressOffset = writeWord(addressOffset, stop3);
-  addressOffset = writeWord(addressOffset, start4);
-  addressOffset = writeWord(addressOffset, stop4);
-  addressOffset = writeWord(addressOffset, light1);
+  addressOffset = writeWord(address, light1);
   addressOffset = writeWord(addressOffset, light2);
   addressOffset = writeWord(addressOffset, light3);
   addressOffset = writeWord(addressOffset, light4);
