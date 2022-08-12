@@ -126,9 +126,6 @@ public:
   void on()
   {
     if (getPinState() == HIGH){
-      if (pin == RELAY1) {
-        delay(5000);  // Required to initialize Aquael lamp (delay of 5s start with mode 1)
-      }
       currentMode = 1;
       digitalWrite(pin, LOW);
     }
@@ -571,6 +568,7 @@ void setup(void)
   configTime(MYTZ, "pool.ntp.org");
   readEEPromData();
   recoverLastSockets();
+  delay(5000);
 }
 
 void loop(void)
