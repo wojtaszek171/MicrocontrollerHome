@@ -1,6 +1,4 @@
 #include <TZ.h>
-#include <WiFiClient.h>
-#include <WiFiServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
@@ -12,7 +10,7 @@
 #include <sntp.h>
 #include <EEPROM.h>
 #include <cstring>
-
+#include <WiFiManager.h>
 /* define constants of various pins for easy accessibility */
 #define RELAY1 D3
 #define RELAY2 D5
@@ -26,7 +24,8 @@
 #define RESET_EEPROM false
 
 WiFiClient wifi;
-
+WiFiManager wifiManager;
+WiFiManagerParameter hostTextBox;
 int en1 = 0;
 String light1 = "";
 
@@ -51,12 +50,8 @@ static time_t now;
 byte mByte[0x07]; // holds the array from the DS3231 register
 byte tByte[0x07]; // holds the array from the NTP server
 
-/* Enter ssid & password of your WiFi inside double quotes */
-const char *ssid = ""; //ENTER WIFI SSID
-const char *password = ""; //ENTER WIFI PASSWORD
-
-String serverName = ""; //PUT YOUR API DOMAIN
 String apiKeyValue = ""; //ENTER API KEY
+String serverName; //PUT YOUR API DOMAIN
 
 unsigned long previousMillisFetch = 0;
 unsigned long previousMillisSensor = 0;
@@ -564,17 +559,23 @@ void setup(void)
   hdc1080.begin(0x40);
   tempSensors.begin();
   delay(10);
-  WiFi.begin(ssid, password); /* connect to WiFi */
+  // wifiManager.resetSettings(); // wipe settings
+  wifiManager.setConfigPortalTimeout(30);
+  new (&hostTextBox) WiFiManagerParameter("api_domain", "API domain", "http://pwojtaszko.ddns.net/espapi/", 50);
+  wifiManager.addParameter(&hostTextBox);
+  wifiManager.autoConnect("SOCKETS CONTROL");
+  serverName = hostTextBox.getValue();
   configTime(MYTZ, "pool.ntp.org");
   readEEPromData();
+  wifiManager.startWebPortal();
   recoverLastSockets();
   delay(5000);
 }
 
 void loop(void)
 {
+  wifiManager.process();
   unsigned long currentMillis = millis();
-
   if (currentMillis - previousMillisFetch >= dbFetchInterval)
   {
     previousMillisFetch = currentMillis;
