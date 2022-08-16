@@ -155,9 +155,10 @@ public:
     }
 
     while (currentMode != newMode) {
+      delay(50);
       if (currentMode == 0) {
-        on();
-        currentMode = 0;
+        on(); // on sets current mode to 1 already
+        continue;
       } else {
         blink();
       }
