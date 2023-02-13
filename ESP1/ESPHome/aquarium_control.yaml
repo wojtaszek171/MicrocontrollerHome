@@ -1,0 +1,108 @@
+substitutions:
+  display_name: aquariumControl
+
+esphome:
+  name: aquarium-control
+  libraries:
+    - "ArduinoJson"
+    - "Wire"
+    - "EEPROM"
+
+  includes:
+    - ./aquarium_control/aquarium_control.h
+
+esp8266:
+  board: esp01_1m
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Aquarium-Control"
+    password: "Is5gTiUJWuz9"
+
+captive_portal:
+
+i2c:
+  - id: ic_1
+    sda: 4
+    scl: 5
+    scan: false
+
+custom_component:
+  lambda: |-
+    auto my_component = new MyCustomComponent();
+    App.register_component(my_component);
+    return {};
+  components:
+
+switch:
+  - platform: custom
+    lambda: |-
+      auto s1_switch = new Socket1Switch();
+      auto s2_switch = new Socket2Switch();
+      auto s3_switch = new Socket3Switch();
+      auto s4_switch = new Socket4Switch();
+
+      App.register_component(s1_switch);
+      App.register_component(s2_switch);
+      App.register_component(s3_switch);
+      App.register_component(s4_switch);
+
+      return {
+        s1_switch,
+        s2_switch,
+        s3_switch,
+        s4_switch
+      };
+  
+    switches:
+      - name: s1_switch
+      - name: s2_switch
+      - name: s3_switch
+      - name: s4_switch
+      
+binary_sensor:
+  - platform: custom
+    lambda: |-
+      auto my_binary_sensor = new CustomBinarySensor();
+      App.register_component(my_binary_sensor);
+      return {
+        my_binary_sensor->socket1_enabled_sensor,
+        my_binary_sensor->socket2_enabled_sensor,
+        my_binary_sensor->socket3_enabled_sensor,
+        my_binary_sensor->socket4_enabled_sensor,
+      };
+
+    binary_sensors:
+      - name: "s1_enabled"
+      - name: "s2_enabled"
+      - name: "s3_enabled"
+      - name: "s4_enabled"
+
+text_sensor:
+- platform: custom
+  lambda: |-
+    auto my_text_sensor = new CustomTextSensor();
+    App.register_component(my_text_sensor);
+    return {
+      my_text_sensor->socket1_modes_sensor,
+      my_text_sensor->socket2_modes_sensor,
+      my_text_sensor->socket3_modes_sensor,
+      my_text_sensor->socket4_modes_sensor
+    };
+  text_sensors:
+    - name: "s1_lights"
+    - name: "s2_lights"
+    - name: "s3_lights"
+    - name: "s4_lights"
