@@ -176,21 +176,21 @@ public:
     if (lightModes != "") {
       int currH = bcd2dec(mByte[2]);
       int currM = bcd2dec(mByte[1]);
+
+      DynamicJsonDocument doc(1024);
+      deserializeJson(doc, lightModes);
+      JsonObject obj = doc.as<JsonObject>();
+
       int prevMode = -1;
       int prevH = 0;
       int prevM = 0;
-      int index = 0;
-      bool isData = true;
-      while(isData == true) {
-        String lightModeStr = getValue(lightModes, '/', index);
-        if (lightModeStr == NULL || lightModeStr == "") {
-          isData = false;
-          index = 0;
-          lightModeStr = getValue(lightModes, '/', 0);
-        }
-        int modeMode = getValue(lightModeStr, ':', 0).toInt();
-        int modeHour = getValue(lightModeStr, ':', 1).toInt();
-        int modeMinutes = getValue(lightModeStr, ':', 2).toInt();
+
+      for (JsonPair fullMode : obj) {
+        ESP_LOGD("custom", "key: %s", fullMode.key().c_str());
+        ESP_LOGD("custom", "value: %d", fullMode.value().as<const int>());
+        int modeMode = fullMode.value().as<const int>();
+        int modeHour = getValue(fullMode.key().c_str(), ':', 0).toInt();
+        int modeMinutes = getValue(fullMode.key().c_str(), ':', 1).toInt();
 
         if (prevMode != -1) {
           if (isEarlier(prevH, prevM, modeHour, modeMinutes))
@@ -198,7 +198,7 @@ public:
             if (!isEarlier(currH, currM, prevH, prevM) && isEarlier(currH, currM, modeHour, modeMinutes))
             {
               changeLightMode(prevMode);
-              isData = false;
+              return;
             }
           }
           else
@@ -206,7 +206,7 @@ public:
             if (!(isEarlier(currH, currM, prevH, prevM) && !isEarlier(currH, currM, modeHour, modeMinutes)))
             {
               changeLightMode(prevMode);
-              isData = false;
+              return;
             }
           }
         }
@@ -214,7 +214,6 @@ public:
         prevMode = modeMode;
         prevH = modeHour;
         prevM = modeMinutes;
-        index++;
       }
     }
   }
@@ -453,7 +452,7 @@ void setSocketNewEnabled(int id, bool enabled)
 
 class CustomTextSensor : public PollingComponent, public TextSensor {
   public:
-    CustomTextSensor() : PollingComponent(5000) {}
+    CustomTextSensor() : PollingComponent(10000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
     TextSensor *socket1_modes_sensor = new TextSensor();
     TextSensor *socket2_modes_sensor = new TextSensor();
@@ -472,7 +471,7 @@ class CustomTextSensor : public PollingComponent, public TextSensor {
 
 class CustomBinarySensor : public PollingComponent, public BinarySensor {
   public:
-    CustomBinarySensor() : PollingComponent(5000) {}
+    CustomBinarySensor() : PollingComponent(10000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
     BinarySensor *socket1_enabled_sensor = new BinarySensor();
     BinarySensor *socket2_enabled_sensor = new BinarySensor();
@@ -512,7 +511,7 @@ class SocketSwitch : public Component, public Switch {
 
 class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
   public:
-    MyCustomComponent() : PollingComponent(5000) {}
+    MyCustomComponent() : PollingComponent(10000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
 
     void on_schedule_change(int id, std::string modes) {
@@ -541,7 +540,7 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
       readEEPromData();
       recoverLastSockets();
       ESP_LOGD("custom", "testing testing");
-      delay(5000);
+      delay(10000);
     }
 
     void update() override
