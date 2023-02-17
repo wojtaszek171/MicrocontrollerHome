@@ -32,7 +32,7 @@ byte tByte[0x07]; // holds the array from the NTP server
 String serverName; //PUT YOUR API DOMAIN
 String apiKeyValue = "tPmAT5Ab3j7F9"; //ENTER API KEY
 
-const long dbFetchInterval = 10000;
+const long dbFetchInterval = 5000;
 const long timeFetchInterval = 60000;
 
 String getValue(String data, char separator, int index)
@@ -82,7 +82,7 @@ public:
   {
     this->pin = pin;
     this->enabled = false;
-    this->lightModes = "";
+    this->lightModes = ""; // stringified JSON { [key: String]: string }
     this->currentMode = 0;
     init();
   }
@@ -163,6 +163,26 @@ public:
   {
     return lightModes;
   }
+  void addLightMode(char * _hour, int mode)
+  {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, lightModes);
+    doc[_hour] = mode;
+
+    String _lightModes;
+    serializeJson(doc, _lightModes);
+    lightModes = _lightModes;
+  }
+  void removeLightMode(char * _hour)
+  {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, lightModes);
+    doc.remove(_hour);
+
+    String _lightModes;
+    serializeJson(doc, _lightModes);
+    lightModes = _lightModes;
+  }
   void setLightMdes(char * _lightModes)
   {
     lightModes = _lightModes;
@@ -173,48 +193,49 @@ public:
   }
   void handleLightModes()
   {
-    if (lightModes != "") {
-      int currH = bcd2dec(mByte[2]);
-      int currM = bcd2dec(mByte[1]);
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, lightModes);
+    JsonObject obj = doc.as<JsonObject>();
 
-      DynamicJsonDocument doc(1024);
-      deserializeJson(doc, lightModes);
-      JsonObject obj = doc.as<JsonObject>();
+    if (obj.size() == 0) {
+      on();
+      return;
+    }
 
-      int prevMode = -1;
-      int prevH = 0;
-      int prevM = 0;
+    int currH = bcd2dec(mByte[2]);
+    int currM = bcd2dec(mByte[1]);
 
-      for (JsonPair fullMode : obj) {
-        ESP_LOGD("custom", "key: %s", fullMode.key().c_str());
-        ESP_LOGD("custom", "value: %d", fullMode.value().as<const int>());
-        int modeMode = fullMode.value().as<const int>();
-        int modeHour = getValue(fullMode.key().c_str(), ':', 0).toInt();
-        int modeMinutes = getValue(fullMode.key().c_str(), ':', 1).toInt();
+    int prevMode = -1;
+    int prevH = 0;
+    int prevM = 0;
 
-        if (prevMode != -1) {
-          if (isEarlier(prevH, prevM, modeHour, modeMinutes))
+    for (JsonPair fullMode : obj) {
+      int modeMode = fullMode.value().as<const int>();
+      int modeHour = getValue(fullMode.key().c_str(), ':', 0).toInt();
+      int modeMinutes = getValue(fullMode.key().c_str(), ':', 1).toInt();
+
+      if (prevMode != -1) {
+        if (isEarlier(prevH, prevM, modeHour, modeMinutes))
+        {
+          if (!isEarlier(currH, currM, prevH, prevM) && isEarlier(currH, currM, modeHour, modeMinutes))
           {
-            if (!isEarlier(currH, currM, prevH, prevM) && isEarlier(currH, currM, modeHour, modeMinutes))
-            {
-              changeLightMode(prevMode);
-              return;
-            }
-          }
-          else
-          {
-            if (!(isEarlier(currH, currM, prevH, prevM) && !isEarlier(currH, currM, modeHour, modeMinutes)))
-            {
-              changeLightMode(prevMode);
-              return;
-            }
+            changeLightMode(prevMode);
+            return;
           }
         }
-
-        prevMode = modeMode;
-        prevH = modeHour;
-        prevM = modeMinutes;
+        else
+        {
+          if (!(isEarlier(currH, currM, prevH, prevM) && !isEarlier(currH, currM, modeHour, modeMinutes)))
+          {
+            changeLightMode(prevMode);
+            return;
+          }
+        }
       }
+
+      prevMode = modeMode;
+      prevH = modeHour;
+      prevM = modeMinutes;
     }
   }
   void handleCurrentTime()
@@ -225,17 +246,7 @@ public:
       return;
     }
     
-    if (lightModes == "")
-    {
-      on();
-    }
-    else
-    {
-      int currH = bcd2dec(mByte[2]);
-      int currM = bcd2dec(mByte[1]);
-
-      handleLightModes();
-    }
+    handleLightModes();
   }
 };
 
@@ -450,9 +461,77 @@ void setSocketNewEnabled(int id, bool enabled)
   saveSettingsToEEPROM();
 }
 
+void removeSocketSchedule(int id, char *hour)
+{
+  switch (id) {
+    case 1:
+      socket1.removeLightMode(hour);
+      break;
+    case 2:
+      socket2.removeLightMode(hour);
+      break;
+    case 3:
+      socket3.removeLightMode(hour);
+      break;
+    case 4:
+      socket4.removeLightMode(hour);
+      break;
+    default:
+      ESP_LOGD("custom", "Wrong socket id specified!");
+      break;
+  }
+
+  saveSettingsToEEPROM();
+}
+
+void addSocketSchedule(int id, char *hour, int mode)
+{
+  switch (id) {
+    case 1:
+      socket1.addLightMode(hour, mode);
+      break;
+    case 2:
+      socket2.addLightMode(hour, mode);
+      break;
+    case 3:
+      socket3.addLightMode(hour, mode);
+      break;
+    case 4:
+      socket4.addLightMode(hour, mode);
+      break;
+    default:
+      ESP_LOGD("custom", "Wrong socket id specified!");
+      break;
+  }
+
+  saveSettingsToEEPROM();
+}
+
+void updateRTC()
+{
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    getNTPDateTime();
+    getRTCdatetime();
+    if (mByte != tByte)
+    {
+      Wire.beginTransmission(0x68);
+      // Set device to start read reg 0
+      Wire.write(0x00);
+      for (int idx = 0; idx < 7; idx++)
+      {
+        Wire.write(dec2bcd(tByte[idx]));
+      }
+      Wire.endTransmission();
+
+      Serial.println(F("New DS3231 register content........\n"));
+    }
+  }
+}
+
 class CustomTextSensor : public PollingComponent, public TextSensor {
   public:
-    CustomTextSensor() : PollingComponent(10000) {}
+    CustomTextSensor() : PollingComponent(5000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
     TextSensor *socket1_modes_sensor = new TextSensor();
     TextSensor *socket2_modes_sensor = new TextSensor();
@@ -471,7 +550,7 @@ class CustomTextSensor : public PollingComponent, public TextSensor {
 
 class CustomBinarySensor : public PollingComponent, public BinarySensor {
   public:
-    CustomBinarySensor() : PollingComponent(10000) {}
+    CustomBinarySensor() : PollingComponent(5000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
     BinarySensor *socket1_enabled_sensor = new BinarySensor();
     BinarySensor *socket2_enabled_sensor = new BinarySensor();
@@ -511,7 +590,7 @@ class SocketSwitch : public Component, public Switch {
 
 class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
   public:
-    MyCustomComponent() : PollingComponent(10000) {}
+    MyCustomComponent() : PollingComponent(5000) {}
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
 
     void on_schedule_change(int id, std::string modes) {
@@ -519,19 +598,29 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
       setSocketNewSchedule(id, const_cast<char*>(modes.c_str()));
     }
 
+    void on_schedule_remove(int id, std::string hour) {
+      ESP_LOGD("custom", "Removing socket schedule");
+      removeSocketSchedule(id, const_cast<char*>(hour.c_str()));
+    }
+
+    void on_schedule_add(int id, std::string hour, int mode) {
+      ESP_LOGD("custom", "Adding socket schedule");
+      addSocketSchedule(id, const_cast<char*>(hour.c_str()), mode);
+    }
+
     void setup() override
     {
       register_service(&MyCustomComponent::on_schedule_change, "update_schedule",
-                    {"socket_num", "modes"});
+        {"socket_num", "modes"});
+
+      register_service(&MyCustomComponent::on_schedule_remove, "remove_schedule",
+        {"socket_num", "hour"});
+
+      register_service(&MyCustomComponent::on_schedule_add, "add_schedule",
+        {"socket_num", "hour", "mode"});
+
       EEPROM.begin(512);
-      if ( false ) {
-        for (int i = 0; i < 512; i++) {
-          EEPROM.write(i, 0);
-        }
-        EEPROM.commit();
-        delay(500);
-      }
-      // digitalWrite(THERMOMETER, HIGH);
+
       while (!Serial)
       {}
       Wire.begin();
@@ -539,16 +628,15 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
       configTime("TZ_Europe_Warsaw", "pool.ntp.org");
       readEEPromData();
       recoverLastSockets();
-      ESP_LOGD("custom", "testing testing");
-      delay(10000);
+      delay(5000);
     }
 
     void update() override
     {
-        // getRTCdatetime();
+        getRTCdatetime();
         saveSettingsToEEPROM(); // save values for later use
         setSocketsState();  // update sockets with new values
 
-        // updateRTC();
+        updateRTC();
     }
 };
