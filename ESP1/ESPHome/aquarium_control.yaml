@@ -49,10 +49,10 @@ custom_component:
 switch:
   - platform: custom
     lambda: |-
-      auto s1_switch = new Socket1Switch();
-      auto s2_switch = new Socket2Switch();
-      auto s3_switch = new Socket3Switch();
-      auto s4_switch = new Socket4Switch();
+      auto s1_switch = new SocketSwitch(1);
+      auto s2_switch = new SocketSwitch(2);
+      auto s3_switch = new SocketSwitch(3);
+      auto s4_switch = new SocketSwitch(4);
 
       App.register_component(s1_switch);
       App.register_component(s2_switch);
@@ -68,15 +68,20 @@ switch:
   
     switches:
       - name: s1_switch
+        id: s1_switch
       - name: s2_switch
+        id: s2_switch
       - name: s3_switch
+        id: s3_switch
       - name: s4_switch
+        id: s4_switch
       
 binary_sensor:
   - platform: custom
     lambda: |-
       auto my_binary_sensor = new CustomBinarySensor();
       App.register_component(my_binary_sensor);
+
       return {
         my_binary_sensor->socket1_enabled_sensor,
         my_binary_sensor->socket2_enabled_sensor,

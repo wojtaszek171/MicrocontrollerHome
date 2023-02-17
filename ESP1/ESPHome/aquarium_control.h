@@ -363,6 +363,12 @@ void recoverLastSockets()
   socket2.setTimes(en2,(char *) light2.c_str());
   socket3.setTimes(en3,(char *) light3.c_str());
   socket4.setTimes(en4,(char *) light4.c_str());
+
+  // update switch states by ids defined in yaml file
+  id(s1_switch).publish_state(socket1.getEnabled());
+  id(s2_switch).publish_state(socket2.getEnabled());
+  id(s3_switch).publish_state(socket3.getEnabled());
+  id(s4_switch).publish_state(socket4.getEnabled());
 }
 
 void saveSettingsToEEPROM()
@@ -422,6 +428,29 @@ void setSocketNewSchedule(int id, char *lightModes)
   saveSettingsToEEPROM();
 }
 
+void setSocketNewEnabled(int id, bool enabled)
+{
+  switch (id) {
+    case 1:
+      socket1.setEnabled(enabled);
+      break;
+    case 2:
+      socket2.setEnabled(enabled);
+      break;
+    case 3:
+      socket3.setEnabled(enabled);
+      break;
+    case 4:
+      socket4.setEnabled(enabled);
+      break;
+    default:
+      ESP_LOGD("custom", "Wrong socket id specified!");
+      break;
+  }
+
+  saveSettingsToEEPROM();
+}
+
 class CustomTextSensor : public PollingComponent, public TextSensor {
   public:
     CustomTextSensor() : PollingComponent(5000) {}
@@ -457,52 +486,26 @@ class CustomBinarySensor : public PollingComponent, public BinarySensor {
       socket3_enabled_sensor->publish_state(socket3.getEnabled());
       socket4_enabled_sensor->publish_state(socket4.getEnabled());
     }
+    
 };
 
-class Socket1Switch : public Component, public Switch {
+class SocketSwitch : public Component, public Switch {
+  private:
+    int id;
   public:
+    SocketSwitch(int id)
+    {
+      this->id = id;
+      init(false);
+    }
+    void init(bool _state)
+    {
+      write_state(_state);
+    }
     float get_setup_priority() const override { return esphome::setup_priority::LATE; }
-    void setup() override {
-      set_restore_mode(SwitchRestoreMode::SWITCH_RESTORE_DEFAULT_ON);
-    }
+    void setup() override {}
     void write_state(bool state) override {
-      socket1.setEnabled(state);
-      publish_state(state);
-    }
-};
-
-class Socket2Switch : public Component, public Switch {
-  public:
-    float get_setup_priority() const override { return esphome::setup_priority::LATE; }
-    void setup() override {
-      set_restore_mode(SwitchRestoreMode::SWITCH_RESTORE_DEFAULT_ON);
-    }
-    void write_state(bool state) override {
-      socket2.setEnabled(state);
-      publish_state(state);
-    }
-};
-
-class Socket3Switch : public Component, public Switch {
-  public:
-    float get_setup_priority() const override { return esphome::setup_priority::LATE; }
-    void setup() override {
-      set_restore_mode(SwitchRestoreMode::SWITCH_RESTORE_DEFAULT_ON);
-    }
-    void write_state(bool state) override {
-      socket3.setEnabled(state);
-      publish_state(state);
-    }
-};
-
-class Socket4Switch : public Component, public Switch {
-  public:
-    float get_setup_priority() const override { return esphome::setup_priority::LATE; }
-    void setup() override {
-      set_restore_mode(SwitchRestoreMode::SWITCH_RESTORE_DEFAULT_ON);
-    }
-    void write_state(bool state) override {
-      socket4.setEnabled(state);
+      setSocketNewEnabled(id, state);
       publish_state(state);
     }
 };
