@@ -119,8 +119,7 @@ public:
       return;
     }
 
-    ESP_LOGD("custom", "Changing mode: %d", currentMode);
-    ESP_LOGD("custom", " -> %d", newMode);
+    ESP_LOGD("custom", "Changing mode: %d -> %d", currentMode, newMode);
 
     if (newMode == 0) {
       off();
@@ -202,12 +201,26 @@ public:
       return;
     }
 
-    int currH = bcd2dec(mByte[2]);
-    int currM = bcd2dec(mByte[1]);
+    if (obj.size() == 1) {
+      JsonObject::iterator firstEl = obj.begin(); // get first element and enable
+      changeLightMode(firstEl -> value().as<const int>());
+      return;
+    }
+
+    int currH = bcd2dec(tByte[2]); // TODO: replace with mByte
+    int currM = bcd2dec(tByte[1]);
 
     int prevMode = -1;
     int prevH = 0;
     int prevM = 0;
+
+    if (obj.size() > 1) {
+      JsonObject::iterator lastEl = obj.begin(); // last element to compare with first
+      lastEl += obj.size() - 1;
+      prevMode = lastEl -> value().as<const int>();
+      prevH = getValue(lastEl -> key().c_str(), ':', 0).toInt();
+      prevM = getValue(lastEl -> key().c_str(), ':', 1).toInt();
+    }
 
     for (JsonPair fullMode : obj) {
       int modeMode = fullMode.value().as<const int>();
