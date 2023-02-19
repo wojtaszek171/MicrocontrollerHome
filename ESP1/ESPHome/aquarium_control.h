@@ -6,7 +6,6 @@
 #include <EEPROM.h>
 #include <cstring>
 
-
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 
@@ -28,12 +27,6 @@ static time_t now;
 
 byte mByte[0x07]; // holds the array from the DS3231 register
 byte tByte[0x07]; // holds the array from the NTP server
-
-String serverName; //PUT YOUR API DOMAIN
-String apiKeyValue = "tPmAT5Ab3j7F9"; //ENTER API KEY
-
-const long dbFetchInterval = 5000;
-const long timeFetchInterval = 60000;
 
 String getValue(String data, char separator, int index)
 {
@@ -170,7 +163,7 @@ public:
 
     String _lightModes;
     serializeJson(doc, _lightModes);
-    lightModes = _lightModes;
+    lightModes = getSortedLightModes(_lightModes);
   }
   void removeLightMode(char * _hour)
   {
@@ -184,11 +177,40 @@ public:
   }
   void setLightMdes(char * _lightModes)
   {
-    lightModes = _lightModes;
+    lightModes = getSortedLightModes(_lightModes);
   }
   int getPinState()
   {
     return digitalRead(pin);
+  }
+  String getSortedLightModes(String _lightModes)
+  {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, _lightModes);
+    JsonObject obj = doc.as<JsonObject>();
+
+    std::vector<char*> vectorKeysArray;
+
+    for (JsonPair fullMode : obj) {
+      vectorKeysArray.push_back((char*) fullMode.key().c_str());
+    }
+
+    std::sort(vectorKeysArray.begin(), vectorKeysArray.end(), [](char *a, char *b) {
+      return strcmp(a, b) < 0;
+    });
+
+    char *keysArray[vectorKeysArray.size()];
+
+    DynamicJsonDocument sortedDoc(1024);
+
+    for (int i = 0; i < vectorKeysArray.size(); i++) {
+        sortedDoc[vectorKeysArray[i]] = doc[vectorKeysArray[i]];
+    }
+
+    String sortedLightModes;
+    serializeJson(sortedDoc, sortedLightModes);
+
+    return sortedLightModes;
   }
   void handleLightModes()
   {
@@ -207,8 +229,8 @@ public:
       return;
     }
 
-    int currH = bcd2dec(tByte[2]); // TODO: replace with mByte
-    int currM = bcd2dec(tByte[1]);
+    int currH = 16; // bcd2dec(tByte[2]); // TODO: replace with mByte
+    int currM = 0; // bcd2dec(tByte[1]);
 
     int prevMode = -1;
     int prevH = 0;
@@ -447,8 +469,6 @@ void setSocketNewSchedule(int id, char *lightModes)
       ESP_LOGD("custom", "Wrong socket id specified!");
       break;
   }
-
-  saveSettingsToEEPROM();
 }
 
 void setSocketNewEnabled(int id, bool enabled)
@@ -470,8 +490,6 @@ void setSocketNewEnabled(int id, bool enabled)
       ESP_LOGD("custom", "Wrong socket id specified!");
       break;
   }
-
-  saveSettingsToEEPROM();
 }
 
 void removeSocketSchedule(int id, char *hour)
@@ -493,8 +511,6 @@ void removeSocketSchedule(int id, char *hour)
       ESP_LOGD("custom", "Wrong socket id specified!");
       break;
   }
-
-  saveSettingsToEEPROM();
 }
 
 void addSocketSchedule(int id, char *hour, int mode)
@@ -516,8 +532,6 @@ void addSocketSchedule(int id, char *hour, int mode)
       ESP_LOGD("custom", "Wrong socket id specified!");
       break;
   }
-
-  saveSettingsToEEPROM();
 }
 
 void updateRTC()
