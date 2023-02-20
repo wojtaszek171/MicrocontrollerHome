@@ -53,17 +53,29 @@ switch:
       auto s2_switch = new SocketSwitch(2);
       auto s3_switch = new SocketSwitch(3);
       auto s4_switch = new SocketSwitch(4);
+      auto s1_force_switch = new SocketForceSwitch(1);
+      auto s2_force_switch = new SocketForceSwitch(2);
+      auto s3_force_switch = new SocketForceSwitch(3);
+      auto s4_force_switch = new SocketForceSwitch(4);
 
       App.register_component(s1_switch);
       App.register_component(s2_switch);
       App.register_component(s3_switch);
       App.register_component(s4_switch);
+      App.register_component(s1_force_switch);
+      App.register_component(s2_force_switch);
+      App.register_component(s3_force_switch);
+      App.register_component(s4_force_switch);
 
       return {
         s1_switch,
         s2_switch,
         s3_switch,
-        s4_switch
+        s4_switch,
+        s1_force_switch,
+        s2_force_switch,
+        s3_force_switch,
+        s4_force_switch
       };
   
     switches:
@@ -75,6 +87,14 @@ switch:
         id: s3_switch
       - name: s4_switch
         id: s4_switch
+      - name: s1_force_switch
+        id: s1_force
+      - name: s2_force_switch
+        id: s2_force
+      - name: s3_force_switch
+        id: s3_force
+      - name: s4_force_switch
+        id: s4_force
       
 binary_sensor:
   - platform: custom

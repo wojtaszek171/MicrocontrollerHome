@@ -9,16 +9,22 @@
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 
+int EEPROM_SIZE = 1024;
+
 int en1 = 0;
+int force1 = 0;
 String light1 = "";
 
 int en2 = 0;
+int force2 = 0;
 String light2 = "";
 
 int en3 = 0;
+int force3 = 0;
 String light3 = "";
 
 int en4 = 0;
+int force4 = 0;
 String light4 = "";
 
 static timeval tv;
@@ -52,6 +58,7 @@ class Socket
 private:
   byte pin;
   bool enabled;
+  bool force;
   String lightModes;
   int currentMode;
   bool isEarlier(int h1, int m1, int h2, int m2)
@@ -74,6 +81,7 @@ public:
   Socket(byte pin)
   {
     this->pin = pin;
+    this->force = false;
     this->enabled = false;
     this->lightModes = ""; // stringified JSON { [key: String]: string }
     this->currentMode = 0;
@@ -150,6 +158,14 @@ public:
   void setEnabled(bool _enabled)
   {
     enabled = _enabled;
+  }
+  bool getForce()
+  {
+    return force;
+  }
+  void setForce(bool _force)
+  {
+    force = _force;
   }
   String getLightModes()
   {
@@ -275,6 +291,11 @@ public:
   }
   void handleCurrentTime()
   {
+    if (force) {
+      on();
+      return;
+    }
+
     if (!enabled)
     {
       off();
@@ -340,6 +361,10 @@ void clearEEPromData()
   en2 = 0;
   en3 = 0;
   en4 = 0;
+  force1 = 0;
+  force2 = 0;
+  force3 = 0;
+  force4 = 0;
   light1 = "";
   light2 = "";
   light3 = "";
@@ -385,6 +410,15 @@ void readEEPromData()
   EEPROM.get(address, en4);
   address += 6;
 
+  EEPROM.get(address, force1);
+  address += 6;
+  EEPROM.get(address, force2);
+  address += 6;
+  EEPROM.get(address, force3);
+  address += 6;
+  EEPROM.get(address, force4);
+  address += 6;
+
   int addressOffset;
   addressOffset = readWord(address, &light1);
   addressOffset = readWord(addressOffset, &light2);
@@ -414,24 +448,37 @@ void recoverLastSockets()
   id(s2_switch).publish_state(socket2.getEnabled());
   id(s3_switch).publish_state(socket3.getEnabled());
   id(s4_switch).publish_state(socket4.getEnabled());
+
+  id(s1_force).publish_state(socket1.getForce());
+  id(s2_force).publish_state(socket2.getForce());
+  id(s3_force).publish_state(socket3.getForce());
+  id(s4_force).publish_state(socket4.getForce());
 }
 
-void saveSettingsToEEPROM()
+void updateEEPROMVariablesWithSocketValues()
 {
-  for (int i = 0; i < 512; i++) {
-    EEPROM.write(i, '\0');
-  }
-  EEPROM.commit();
-  delay(500);
   clearEEPromData();
   en1 = socket1.getEnabled();
   en2 = socket2.getEnabled();
   en3 = socket3.getEnabled();
   en4 = socket4.getEnabled();
+  force1 = socket1.getForce();
+  force2 = socket2.getForce();
+  force3 = socket3.getForce();
+  force4 = socket4.getForce();
   light1 = socket1.getLightModes();
   light2 = socket2.getLightModes();
   light3 = socket3.getLightModes();
   light4 = socket4.getLightModes();
+}
+
+void saveSettingsToEEPROM()
+{
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    EEPROM.write(i, '\0');
+  }
+  EEPROM.commit();
+  delay(500);
 
   int address = 0;
   EEPROM.put(address, en1);
@@ -441,6 +488,15 @@ void saveSettingsToEEPROM()
   EEPROM.put(address, en3);
   address += 6;
   EEPROM.put(address, en4);
+  address += 6;
+
+  EEPROM.put(address, force1);
+  address += 6;
+  EEPROM.put(address, force2);
+  address += 6;
+  EEPROM.put(address, force3);
+  address += 6;
+  EEPROM.put(address, force4);
   address += 6;
 
   int addressOffset;
@@ -485,6 +541,27 @@ void setSocketNewEnabled(int id, bool enabled)
       break;
     case 4:
       socket4.setEnabled(enabled);
+      break;
+    default:
+      ESP_LOGD("custom", "Wrong socket id specified!");
+      break;
+  }
+}
+
+void setSocketNewForce(int id, bool force)
+{
+  switch (id) {
+    case 1:
+      socket1.setForce(force);
+      break;
+    case 2:
+      socket2.setForce(force);
+      break;
+    case 3:
+      socket3.setForce(force);
+      break;
+    case 4:
+      socket4.setForce(force);
       break;
     default:
       ESP_LOGD("custom", "Wrong socket id specified!");
@@ -615,6 +692,27 @@ class SocketSwitch : public Component, public Switch {
     }
 };
 
+class SocketForceSwitch : public Component, public Switch {
+  private:
+    int id;
+  public:
+    SocketForceSwitch(int id)
+    {
+      this->id = id;
+      init(false);
+    }
+    void init(bool _state)
+    {
+      write_state(_state);
+    }
+    float get_setup_priority() const override { return esphome::setup_priority::LATE; }
+    void setup() override {}
+    void write_state(bool state) override {
+      setSocketNewForce(id, state);
+      publish_state(state);
+    }
+};
+
 class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
   public:
     MyCustomComponent() : PollingComponent(5000) {}
@@ -635,8 +733,16 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
       addSocketSchedule(id, const_cast<char*>(hour.c_str()), mode);
     }
 
+    void on_device_reset() {
+      clearEEPromData();
+      saveSettingsToEEPROM();
+      ESP.restart();
+    }
+
     void setup() override
     {
+      register_service(&MyCustomComponent::on_device_reset, "reset_device_memory");
+
       register_service(&MyCustomComponent::on_schedule_change, "update_schedule",
         {"socket_num", "modes"});
 
@@ -646,7 +752,7 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
       register_service(&MyCustomComponent::on_schedule_add, "add_schedule",
         {"socket_num", "hour", "mode"});
 
-      EEPROM.begin(512);
+      EEPROM.begin(EEPROM_SIZE);
 
       while (!Serial)
       {}
@@ -661,6 +767,7 @@ class MyCustomComponent : public PollingComponent, public CustomAPIDevice {
     void update() override
     {
         getRTCdatetime();
+        updateEEPROMVariablesWithSocketValues();
         saveSettingsToEEPROM(); // save values for later use
         setSocketsState();  // update sockets with new values
 
