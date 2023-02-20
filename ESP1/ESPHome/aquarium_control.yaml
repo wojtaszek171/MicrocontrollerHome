@@ -30,6 +30,7 @@ wifi:
   ap:
     ssid: "Aquarium-Control"
     password: "Is5gTiUJWuz9"
+    ap_timeout: 2min
 
 captive_portal:
 

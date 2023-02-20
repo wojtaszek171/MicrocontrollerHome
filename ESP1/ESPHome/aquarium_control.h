@@ -9,7 +9,7 @@
 #define bcd2dec(bcd_in) (bcd_in >> 4) * 10 + (bcd_in & 0x0f)
 #define dec2bcd(dec_in) ((dec_in / 10) << 4) + (dec_in % 10)
 
-int EEPROM_SIZE = 1024;
+int EEPROM_SIZE = 2048; // high value to secure cases when somebody sets many schedules
 
 int en1 = 0;
 int force1 = 0;
