@@ -1,0 +1,95 @@
+<!DOCTYPE HTML><html>
+  <head>
+    <title>ESP32 WEB SERVER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <style>
+      html {font-family: Arial; display: inline-block; text-align: center;}
+      body {margin: 0; background-color: #202324; color: #d1d1d1;}
+      .socket-row:nth-child(odd) {background-color: #26292a;}
+      .socket-component {display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; margin: 0 auto; padding-top: 15px; padding-bottom: 15px; max-width: 480px;}
+      .socket-name {padding-right: 5px; margin: 0 auto; margin-bottom: 10px;}
+      .socket-name > span {font-weight: bold; margin-left: 2px;}
+      .socket-options label, .socket-options input {cursor: pointer;}
+      .socket-options input[type="checkbox"] {appearance: none; -webkit-appearance: none; height: 13px; width: 13px; position: relative; transition: 0.10s; background-color: #b11a1a; text-align: center; font-weight: 600; color: white; border-radius: 3px; outline: none;}
+      .socket-options input[type="checkbox"] {float: right; margin-left: 10px;}
+      .socket-options input[type="checkbox"]:checked {background-color: #0E9700;}
+      .light-modes {display: flex; flex-direction: column; align-items: center; margin: 0 auto;}
+      .light-modes div {border: 1px solid black; background: #fff; border-radius: 5px; padding: 2px; max-width:  300px; display: flex; flex-direction: row;}
+      .light-modes div span {flex: 1; display: flex; align-items: center;}
+      .light-modes input {max-width: 100px; border-width: 0 1px 0 0px;}
+      .light-modes select {border: none;}
+      .light-modes button {width: 25px; height: 25px; border: 0; color: #b11a1a; font-weight: bold; line-height: 10px; cursor: pointer;}
+    </style>
+  </head>
+  <body>
+    <h2>Aquarium control</h2>
+    <div class="sockets">
+      <div class="socket-row">
+        <div class="socket-component">
+          <div class="socket-name">
+            <span>Socket 1</span>
+            <div class="socket-options">
+              %SOCKET1OPTIONS%
+            </div>
+          </div>
+          <div class="light-modes">
+            %SOCKET1MODES%
+          </div>
+        </div>
+      </div>
+      <div class="socket-row">
+        <div class="socket-component">
+          <div class="socket-name">
+            <span>Socket 2</span>
+            <div class="socket-options">
+              %SOCKET2OPTIONS%
+            </div>
+          </div>
+          <div class="light-modes">
+            %SOCKET2MODES%
+          </div>
+        </div>
+      </div>
+      <div class="socket-row">
+        <div class="socket-component">
+          <div class="socket-name">
+            <span>Socket 3</span>
+            <div class="socket-options">
+              %SOCKET3OPTIONS%
+            </div>
+          </div>
+          <div class="light-modes">
+            %SOCKET3MODES%
+          </div>
+        </div>
+      </div>
+      <div class="socket-row">
+        <div class="socket-component">
+          <div class="socket-name">
+            <span>Socket 4</span>
+            <div class="socket-options">
+              %SOCKET4OPTIONS%
+            </div>
+          </div>
+          <div class="light-modes">
+            %SOCKET4MODES%
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      function toggleCheckbox(element) {
+        var xhr = new XMLHttpRequest();
+        if(element.checked){ xhr.open("GET", "/update?output="+element.id+"&state=1", true); }
+        else { xhr.open("GET", "/update?output="+element.id+"&state=0", true); }
+        xhr.send();
+      }
+      function openPortal() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/wifi", true);
+        xhr.send();
+      }
+    </script>
+  </body>
+  </html>
