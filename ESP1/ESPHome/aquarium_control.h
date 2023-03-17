@@ -845,7 +845,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       function toggleSchedule(element, id) {
         var xhr = new XMLHttpRequest();
         var enabled = element.checked === true ? 1 : 0;
-        xhr.open("GET", "/sockets/update?id="+id+"&enabled="+enabled, true);
+        xhr.open("GET", "/sockets/update?id="+id+"&scheduleEnabled="+enabled, true);
         xhr.send();
       }
       function removeSocketSchedule(id, hour) {
