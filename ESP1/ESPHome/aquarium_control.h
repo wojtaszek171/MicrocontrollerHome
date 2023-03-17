@@ -143,10 +143,10 @@ public:
       }
     }
   }
-  void restoreSocket(bool _enabled, char* _lightModes)
+  void restoreSocket(bool _enabled, bool _scheduleEnabled, char* _lightModes)
   {
     enabled = _enabled;
-
+    scheduleEnabled = _scheduleEnabled;
     setLightModes(_lightModes);
   }
   byte getPin()
@@ -415,18 +415,18 @@ void readEEPromData()
   ESP_LOGD("custom", "%d", en2);
   ESP_LOGD("custom", "%d", en3);
   ESP_LOGD("custom", "%d", en4);
-  ESP_LOGD("custom", "%d", light1);
-  ESP_LOGD("custom", "%d", light2);
-  ESP_LOGD("custom", "%d", light3);
-  ESP_LOGD("custom", "%d", light4);
+  ESP_LOGD("custom", "%d", light1.c_str());
+  ESP_LOGD("custom", "%d", light2.c_str());
+  ESP_LOGD("custom", "%d", light3.c_str());
+  ESP_LOGD("custom", "%d", light4.c_str());
 }
 
 void restoreLastSockets()
 {
-  socket1.restoreSocket(en1,(char *) light1.c_str());
-  socket2.restoreSocket(en2,(char *) light2.c_str());
-  socket3.restoreSocket(en3,(char *) light3.c_str());
-  socket4.restoreSocket(en4,(char *) light4.c_str());
+  socket1.restoreSocket(en1, scheduleEnabled1,(char *) light1.c_str());
+  socket2.restoreSocket(en2, scheduleEnabled2,(char *) light2.c_str());
+  socket3.restoreSocket(en3, scheduleEnabled3,(char *) light3.c_str());
+  socket4.restoreSocket(en4, scheduleEnabled4,(char *) light4.c_str());
 
   // update switch states by ids defined in yaml file
   id(s1_enable_switch).publish_state(socket1.getEnabled());
@@ -485,10 +485,10 @@ void saveSettingsToEEPROM()
   address += 6;
 
   int addressOffset;
-  addressOffset = writeWord(address, light1);
-  addressOffset = writeWord(addressOffset, light2);
-  addressOffset = writeWord(addressOffset, light3);
-  addressOffset = writeWord(addressOffset, light4);
+  addressOffset = writeWord(address, light1.c_str());
+  addressOffset = writeWord(addressOffset, light2.c_str());
+  addressOffset = writeWord(addressOffset, light3.c_str());
+  addressOffset = writeWord(addressOffset, light4.c_str());
 }
 
 Socket getSocketById(int id)
@@ -845,7 +845,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       function toggleSchedule(element, id) {
         var xhr = new XMLHttpRequest();
         var enabled = element.checked === true ? 1 : 0;
-        xhr.open("GET", "/sockets/update?id="+id+"&scheduleEnabled="+enabled, true);
+        xhr.open("GET", "/sockets/update?id="+id+"&enabled="+enabled, true);
         xhr.send();
       }
       function removeSocketSchedule(id, hour) {
@@ -866,12 +866,12 @@ const char index_html[] PROGMEM = R"rawliteral(
 String returnOptionsHTML(int id){
   Socket socketById = getSocketById(id);
   String options = "<hr><div><label>Enabled<input type=\"checkbox\"";
-  options += String() + "onChange='toggleSchedule(this, "+ id +")'";
+  options += String() + "onChange='toggleEnabled(this, "+ id +")'";
   if (socketById.getEnabled()) {
     options += " checked";
   }
   options += "/></label></div><hr><div><label>Schedule<input type=\"checkbox\"";
-  options += String() + "onChange='toggleEnabled(this, "+ id +")'";
+  options += String() + "onChange='toggleSchedule(this, "+ id +")'";
   if (socketById.getScheduleEnabled()){
     options += " checked";
   }
