@@ -762,6 +762,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     <style>
       html {font-family: Arial; display: inline-block; text-align: center;}
       body {margin: 0; background-color: #202324; color: #d1d1d1;}
+      input, select {background-color: #fff}
       .socket-row:nth-child(odd) {background-color: #26292a;}
       .socket-component {display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; margin: 0 auto; padding-top: 15px; padding-bottom: 15px; max-width: 480px;}
       .socket-name {padding-right: 5px; margin: 0 auto; margin-bottom: 10px;}
@@ -835,10 +836,21 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
     </div>
     <script>
-      function toggleCheckbox(element) {
+      function toggleEnabled(element, id) {
         var xhr = new XMLHttpRequest();
-        if(element.checked){ xhr.open("GET", "/update?output="+element.id+"&state=1", true); }
-        else { xhr.open("GET", "/update?output="+element.id+"&state=0", true); }
+        var enabled = element.checked === true ? 1 : 0;
+        xhr.open("GET", "/sockets/update?id="+id+"&enabled="+enabled, true);
+        xhr.send();
+      }
+      function toggleSchedule(element, id) {
+        var xhr = new XMLHttpRequest();
+        var enabled = element.checked === true ? 1 : 0;
+        xhr.open("GET", "/sockets/update?id="+id+"&scheduleEnabled="+enabled, true);
+        xhr.send();
+      }
+      function removeSocketSchedule(id, hour) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/sockets/schedule/remove?id="+id+"&hour="+hour, true);
         xhr.send();
       }
       function openPortal() {
@@ -854,10 +866,12 @@ const char index_html[] PROGMEM = R"rawliteral(
 String returnOptionsHTML(int id){
   Socket socketById = getSocketById(id);
   String options = "<hr><div><label>Enabled<input type=\"checkbox\"";
+  options += String() + "onChange='toggleSchedule(this, "+ id +")'";
   if (socketById.getEnabled()) {
     options += " checked";
   }
   options += "/></label></div><hr><div><label>Schedule<input type=\"checkbox\"";
+  options += String() + "onChange='toggleEnabled(this, "+ id +")'";
   if (socketById.getScheduleEnabled()){
     options += " checked";
   }
@@ -873,7 +887,7 @@ String renderModeHTML(int id, int mode, String time) {
   modeHTML += "<option value=\"1\">ON</option>";
   modeHTML += "<option value=\"2\">Evening (Aquael)</option>";
   modeHTML += "<option value=\"3\">Night (Aquael)</option>";
-  modeHTML += "</select></span><button>x</button></div>";
+  modeHTML += String() + "</select></span><button onClick='removeSocketSchedule("+ id +",\""+ time +"\")'>x</button></div>";
   return modeHTML;
 }
 
@@ -932,6 +946,7 @@ class WebComponent : public Component, public AsyncWebHandler { // use own web s
         request->send_P(200, "text/html", index_html, processor);
       });
       server.on("/sockets/update", HTTP_GET, [](AsyncWebServerRequest *request){
+        ESP_LOGD("custom", "Updating socket settings...");
         int params = request->params();
         if (!request->hasParam("id")) {
           return;
@@ -948,14 +963,17 @@ class WebComponent : public Component, public AsyncWebHandler { // use own web s
             std::stoi(request->getParam("scheduleEnabled")->value().c_str())
           );
         }
+        request->send(200, "text/plain", "OK");
       });
       server.on("/sockets/schedule/remove", HTTP_GET, [](AsyncWebServerRequest *request){
         int params = request->params();
         if (request->hasParam("id") && request->hasParam("hour")) {
+          ESP_LOGD("custom", "Removing schedule...");
           removeSocketSchedule(
             std::stoi(request->getParam("id")->value().c_str()),
             const_cast<char*> (request->getParam("hour")->value().c_str())
           );
+          request->send(200, "text/plain", "OK");
         }
       });
       server.on("/sockets/schedule/set", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -969,10 +987,10 @@ class WebComponent : public Component, public AsyncWebHandler { // use own web s
         }
       });
       server.on("/wifi", HTTP_GET, [](AsyncWebServerRequest *request){ // doesn't work. Captive doesn't start.
+        captive_portal::global_captive_portal->start(); // starts captive portal
         ESP_LOGD("custom", "Starting wifi portal");
         request->send(200, "text/plain", "OK");
         server.end();
-        captive_portal::global_captive_portal->start(); // starts captive portal
       });
       
       server.begin();
